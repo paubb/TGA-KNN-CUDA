@@ -57,6 +57,23 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
     return (freq1 > freq2 ? 0 : 1); 
 }
 
+void InitHostInput(Point arr[], int n, Point p, float *ref_points_host, float *result_prediction_host) {
+
+    for (int i=0; i<n; i++) 
+        ref_points_host[i] = arr[i];
+    
+}
+
+__global__ void calculateDistance(Point arr[], int n, int k, Point p, float *result_prediction_dev, float *ref_points_dev) {
+    
+    // Fill distances of all points from p 
+    for (int i = 0; i < n; i++) 
+        arr[i].distance = 
+            sqrt((arr[i].x - p.x) * (arr[i].x - p.x) + 
+                 (arr[i].y - p.y) * (arr[i].y - p.y)); 
+    
+}
+
 int classifyAPointCUDA(Point arr[], int n, int k, Point p) 
 { 
     unsigned int N;
@@ -84,21 +101,23 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     
     // Obtener Memoria en el host
     ref_points_host = (float*) malloc(numBytes); 
-    dist_points_host = (float*) malloc(numBytes);  
+    result_prediction_host = (float*) malloc(numBytes);  
+    
+    InitHostInput(arr[], n, p, ref_points_host, result_prediction_host);
     
     // Obtener Memoria en el device
     cudaMalloc((float**)&ref_points_dev, numBytes); 
-    cudaMalloc((float**)&dist_points_dev, numBytes); 
+    cudaMalloc((float**)&result_prediction_dev, numBytes); 
     
     // Copiar datos desde el host en el device 
     cudaMemcpy(ref_points_dev, ref_points_host, numBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(dist_points_dev, dist_points_host,numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
     
     // Ejecutar el kernel 
     
     
     
-    return 0
+    return 0;
     
 }
 
@@ -173,13 +192,13 @@ int main(int argc, char** argv)
     t2 = clock();
     int result2 = classifyAPointCUDA(arr, n, k, p);
     t2 = clock() - t2; 
-    double time_taken2 = ((double)t)/CLOCKS_PER_SEC; // in seconds 
+    double time_taken2 = ((double)t2)/CLOCKS_PER_SEC; // in seconds 
     
     printf ("The value classified to unknown point"
             " is %d.\n", result2);
             
     printf ("Temps CUDA:"
-            " is %lf.\n", time_taken);
+            " is %lf.\n", time_taken2);
     
 }
 
