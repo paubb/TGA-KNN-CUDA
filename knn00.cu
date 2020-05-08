@@ -59,9 +59,10 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
 
 void InitHostInput(Point arr[], int n, Point p, float *ref_points_host_x, float *ref_points_host_y, float *result_prediction_host) {
 
-    for (int i=0; i<n; i++) 
+    for (int i=0; i<n; i++) {
         ref_points_host_x[i] = arr[i].x;
         ref_points_host_y[i] = arr[i].y;
+    }
     
 }
 
@@ -112,7 +113,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     ref_points_host_y = (float*) malloc(numBytes); 
     result_prediction_host = (float*) malloc(numBytes);  
     
-    InitHostInput(arr[], n, p, ref_points_host_x, ref_points_host_y, result_prediction_host);
+    InitHostInput(arr, n, p, ref_points_host_x, ref_points_host_y, result_prediction_host);
     
     // Obtener Memoria en el device
     cudaMalloc((float**)&ref_points_dev_x, numBytes); 
@@ -135,9 +136,9 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     
     // Liberar Memoria del device 
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    cudaFree(ref_points_dev_x);
+    cudaFree(ref_points_dev_y);
+    cudaFree(result_prediction_dev);
     
     cudaEventElapsedTime(&TiempoTotal,  E0, E3);
     printf("Invocació Kernel <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", nBlocks, nThreads, n);
