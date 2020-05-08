@@ -9,7 +9,7 @@
 using namespace std;
 
 #define PINNED 0
-#define THREADS 8
+#define THREADS 1000
 
 struct Point 
 { 
@@ -57,20 +57,23 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
     return (freq1 > freq2 ? 0 : 1); 
 }
 
-void InitHostInput(Point arr[], int n, Point p, float *ref_points_host, float *result_prediction_host) {
+void InitHostInput(Point arr[], int n, Point p, float *ref_points_host_x, float *ref_points_host_y, float *result_prediction_host) {
 
     for (int i=0; i<n; i++) 
-        ref_points_host[i] = arr[i];
+        ref_points_host_x[i] = arr[i].x;
+        ref_points_host_y[i] = arr[i].y;
     
 }
 
-__global__ void calculateDistance(Point arr[], int n, int k, Point p, float *result_prediction_dev, float *ref_points_dev) {
+__global__ void calculateDistance(int n, Point p, float *ref_points_dev_x, float *ref_points_dev_y, float *result_prediction_dev) {
     
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
     // Fill distances of all points from p 
-    for (int i = 0; i < n; i++) 
-        arr[i].distance = 
-            sqrt((arr[i].x - p.x) * (arr[i].x - p.x) + 
-                 (arr[i].y - p.y) * (arr[i].y - p.y)); 
+    if(i < n) { 
+        result_prediction_dev[i] = 
+            sqrt((ref_points_dev_x[i] - p.x) * (ref_points_dev_x[i] - p.x) + 
+                 (ref_points_dev_y[i] - p.y) * (ref_points_dev_y[i] - p.y)); 
+    }
     
 }
 
@@ -83,10 +86,12 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     float TiempoTotal;
     cudaEvent_t E0, E3;
     
-    float * ref_points_dev   = NULL;
+    float * ref_points_dev_x   = NULL;
+    float * ref_points_dev_y   = NULL;
     float * result_prediction_dev  = NULL;
     
-    float * ref_points_host   = NULL;
+    float * ref_points_host_x   = NULL;
+    float * ref_points_host_y = NULL;
     float * result_prediction_host  = NULL;
     
     // numero de Threads
@@ -99,24 +104,48 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     numBytes = nBlocks * nThreads * sizeof(float);
     printf("numBytes = %d \n", numBytes);
     
+    cudaEventCreate(&E0);
+    cudaEventCreate(&E3);
+    
     // Obtener Memoria en el host
-    ref_points_host = (float*) malloc(numBytes); 
+    ref_points_host_x = (float*) malloc(numBytes); 
+    ref_points_host_y = (float*) malloc(numBytes); 
     result_prediction_host = (float*) malloc(numBytes);  
     
-    InitHostInput(arr[], n, p, ref_points_host, result_prediction_host);
+    InitHostInput(arr[], n, p, ref_points_host_x, ref_points_host_y, result_prediction_host);
     
     // Obtener Memoria en el device
-    cudaMalloc((float**)&ref_points_dev, numBytes); 
+    cudaMalloc((float**)&ref_points_dev_x, numBytes); 
+    cudaMalloc((float**)&ref_points_dev_y, numBytes); 
     cudaMalloc((float**)&result_prediction_dev, numBytes); 
     
+    cudaEventRecord(E0, 0);
+    
     // Copiar datos desde el host en el device 
-    cudaMemcpy(ref_points_dev, ref_points_host, numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(ref_points_dev_x, ref_points_host_x, numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(ref_points_dev_y, ref_points_host_y, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
     
     // Ejecutar el kernel 
+    calculateDistance<<<nBlocks, nThreads>>>(n, p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
     
+    // Obtener el resultado desde el host 
+    cudaMemcpy(result_prediction_host, result_prediction_dev, numBytes, cudaMemcpyDeviceToHost);
     
+    cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     
+    // Liberar Memoria del device 
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    
+    cudaEventElapsedTime(&TiempoTotal,  E0, E3);
+    printf("Invocació Kernel <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", nBlocks, nThreads, n);
+    
+    printf("Tiempo Global (00): %4.6f milseg\n", TiempoTotal);
+        
+    free(ref_points_host_x); free(ref_points_host_y); free(result_prediction_host);
+      
     return 0;
     
 }
