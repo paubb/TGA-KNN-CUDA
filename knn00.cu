@@ -87,13 +87,13 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     float TiempoTotal;
     cudaEvent_t E0, E3;
     
-    float * ref_points_dev_x   = NULL;
-    float * ref_points_dev_y   = NULL;
-    float * result_prediction_dev  = NULL;
+    float *ref_points_dev_x   = NULL;
+    float *ref_points_dev_y   = NULL;
+    float *result_prediction_dev  = NULL;
     
-    float * ref_points_host_x   = NULL;
-    float * ref_points_host_y = NULL;
-    float * result_prediction_host  = NULL;
+    float *ref_points_host_x   = NULL;
+    float *ref_points_host_y = NULL;
+    float *result_prediction_host  = NULL;
     
     // numero de Threads
     nThreads = THREADS;
