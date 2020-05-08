@@ -67,44 +67,38 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaEvent_t E0, E3;
     
     float * ref_points_dev   = NULL;
-    float * dist_points_dev  = NULL;
+    float * result_prediction_dev  = NULL;
     
     float * ref_points_host   = NULL;
-    float * dist_points_host  = NULL;
+    float * result_prediction_host  = NULL;
     
     // numero de Threads
     nThreads = THREADS;
 
     // numero de Blocks en cada dimension 
-    nBlocks = (N+nThreads-1)/nThreads; 
-  
+    nBlocks = (n+nThreads-1)/nThreads; 
+    printf("nBlocks = %d \n", nBlocks);
+    
     numBytes = nBlocks * nThreads * sizeof(float);
+    printf("numBytes = %d \n", numBytes);
     
-    cudaEventCreate(&E0);
-    cudaEventCreate(&E3);
-    
-    if (PINNED) {
-        // Obtiene Memoria [pinned] en el host
-        cudaMallocHost((float**)&ref_points_host, numBytes); 
-        cudaMallocHost((float**)&dist_points_host, numBytes); 
-    }
-    else {
-        // Obtener Memoria en el host
-        ref_points_host = (float*) malloc(numBytes); 
-        dist_points_host = (float*) malloc(numBytes);  
-    }
+    // Obtener Memoria en el host
+    ref_points_host = (float*) malloc(numBytes); 
+    dist_points_host = (float*) malloc(numBytes);  
     
     // Obtener Memoria en el device
     cudaMalloc((float**)&ref_points_dev, numBytes); 
     cudaMalloc((float**)&dist_points_dev, numBytes); 
-    
-    cudaEventRecord(E0, 0);
     
     // Copiar datos desde el host en el device 
     cudaMemcpy(ref_points_dev, ref_points_host, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(dist_points_dev, dist_points_host,numBytes, cudaMemcpyHostToDevice);
     
     // Ejecutar el kernel 
+    
+    
+    
+    return 0
     
 }
 
@@ -142,7 +136,7 @@ int main(int argc, char** argv)
     else { printf("Usage: ./exe k TestPointCoordenadaX TestPointCoordenadaY\n"); exit(0); }
     
     //Es crea l'estructura sobre la qual es vol fer la predicció
-    n = 100000; // Number of data points 
+    n = 1000000; // Number of data points 
     Point arr[n];
     
     for(int i = 0; i < n; ++i) {
@@ -170,6 +164,21 @@ int main(int argc, char** argv)
             " is %d.\n", result);
             
     printf ("Temps seqüencial:"
+            " is %lf.\n", time_taken);
+    
+    printf("---------------------------------------------------------------------- \n");
+    
+    // Calculate the time taken by the sequential code: classifyAPoint function 
+    clock_t t2; 
+    t2 = clock();
+    int result2 = classifyAPointCUDA(arr, n, k, p);
+    t2 = clock() - t2; 
+    double time_taken2 = ((double)t)/CLOCKS_PER_SEC; // in seconds 
+    
+    printf ("The value classified to unknown point"
+            " is %d.\n", result2);
+            
+    printf ("Temps CUDA:"
             " is %lf.\n", time_taken);
     
 }
