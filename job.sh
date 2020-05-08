@@ -7,7 +7,7 @@ export PATH=/Soft/cuda/9.0.176/bin:$PATH
 # Asegurar que el job mantiene las variables de entorno del shell lamador
 #$ -V
 # Cambiar el nombre del job
-#$ -N STREAMS 
+#$ -N KNN 
 # Cambiar el shell
 #$ -S /bin/bash
 
