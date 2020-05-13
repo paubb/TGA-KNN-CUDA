@@ -90,6 +90,13 @@ void InitHostInput(Point arr[], int n, Point p, double *ref_points_host_x, doubl
 
 }
 
+void InitHostFreq(double *freq1_host, double *freq2_host) {
+
+    freq1_host[0] = 0.0;
+    freq2_host[0] = 0.0;
+
+}
+
 __global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, double *ref_points_dev_y, double *result_prediction_dev) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -102,23 +109,16 @@ __global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, doub
 
 }
 
-__global__ void calculateFreq(int k, double *ref_points_host_val, double *result_freq_dev) {
+__global__ void calculateFreq(int k, double *ref_points_host_val, double *freq1_dev, double *freq2_dev) {
 
-
-    // Now consider the first k elements and only
-    // two groups
-    double freq1 = 0;     // Frequency of group 0
-    double freq2 = 0;     // Frequency of group 1
-    for (int i = 0; i < k; i++)
-    {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if(i < n) {
         if (ref_points_host_val[i] == 0)
-            freq1++;
+            freq1_dev[0]++;
         else if (ref_points_host_val[i] == 1)
-            freq2++;
-
+            freq2_dev[0]++;
     }
-    if(freq1 > freq2) result_freq_dev[0] = 0.0f;
-    else result_freq_dev[0] = 1.0f;
 }
 
 int classifyAPointCUDA(Point arr[], int n, int k, Point p)
@@ -127,7 +127,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
-    double TiempoTotal;
+    float TiempoTotal;
     cudaEvent_t E0, E3;
 
     double *ref_points_dev_x   = NULL;
@@ -135,14 +135,16 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     double *ref_points_dev_val   = NULL;
     double *result_prediction_dev  = NULL;
 
-    double *result_freq_dev = NULL;
-
-    double *result_freq_host = NULL;
-
     double *ref_points_host_x   = NULL;
     double *ref_points_host_y = NULL;
     double *ref_points_host_val   = NULL;
     double *result_prediction_host  = NULL;
+    
+    double *freq1_dev = NULL;
+    double *freq2_dev = NULL;
+    double *freq1_host = NULL;
+    double *freq1_host = NULL;
+    
 
     // numero de Threads
     nThreads = THREADS;
@@ -162,18 +164,22 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     ref_points_host_y = (double*) malloc(numBytes);
     ref_points_host_val = (double*) malloc(numBytes);
     result_prediction_host = (double*) malloc(numBytes);
-
-    result_freq_host = (double*) malloc(numBytes);
+    
+    freq1_host = (double*) malloc(sizeof(double));
+    freq2_host = (double*) malloc(sizeof(double));
 
     InitHostInput(arr, n, p, ref_points_host_x, ref_points_host_y, ref_points_host_val);
 
+    InitHostFreq(freq1_host, freq2_host);
+    
     // Obtener Memoria en el device
     cudaMalloc((double**)&ref_points_dev_x, numBytes);
     cudaMalloc((double**)&ref_points_dev_y, numBytes);
     cudaMalloc((double**)&ref_points_dev_val, numBytes);
     cudaMalloc((double**)&result_prediction_dev, numBytes);
 
-    cudaMalloc((double**)&result_freq_dev, numBytes);
+    cudaMalloc((double**)&freq1_dev, sizeof(double));
+    cudaMalloc((double**)&freq2_dev, sizeof(double));
 
 
     // Copiar datos desde el host en el device
@@ -182,8 +188,9 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaMemcpy(ref_points_dev_val, ref_points_host_val, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
 
-    cudaMemcpy(result_freq_dev, result_freq_host, numBytes, cudaMemcpyHostToDevice);
-
+    cudaMemcpy(freq1_dev, freq1_host, sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(freq2_dev, freq2_host, sizeof(double), cudaMemcpyHostToDevice);
+    
     cudaEventRecord(E0, 0);
 
     // Ejecutar el kernel
@@ -212,22 +219,28 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     */
 
     // Ejecutar el kernel
-    calculateFreq<<<nBlocks, nThreads>>>(k, ref_points_dev_val, result_freq_dev);
+    calculateFreq<<<nBlocks, nThreads>>>(k, ref_points_dev_val, freq1_dev, freq2_dev);
 
-    cudaMemcpy(result_freq_host, result_freq_dev, numBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(freq1_host, freq1_dev, sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(freq2_host, freq2_dev, sizeof(double), cudaMemcpyDeviceToHost);
 
     cudaFree(ref_points_dev_val);
-    cudaFree(result_freq_dev);
-
+    cudaFree(freq1_dev);
+    cudaFree(freq2_dev);
+    
+    double result = NULL;
+    if(freq1_host[0] > freq2_host[0]) result = 0.0;
+    else result = 1.0;
+    
     printf ("The value classified to unknown point"
-            " is %f.\n", result_freq_host[0]);
-    double result = result_freq_host[0];
+            " is %f.\n", result);
+
 
     printf("Invocació Kernel <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", nBlocks, nThreads, n);
 
     printf("Tiempo Global (00): %4.6f milseg\n", TiempoTotal);
 
-    free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(result_freq_host);
+    free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(result_freq_host); free(freq1_host); free(freq1_host);
 
     return result;
 
