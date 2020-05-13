@@ -101,11 +101,11 @@ __global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, doub
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     // Fill distances of all points from p
-    if(i < n) {
+
         result_prediction_dev[i] =
             sqrt((ref_points_dev_x[i] - p.x) * (ref_points_dev_x[i] - p.x) +
                  (ref_points_dev_y[i] - p.y) * (ref_points_dev_y[i] - p.y));
-    }
+
 
 }
 
@@ -196,6 +196,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 
     cudaEventRecord(E0, 0);
 
+    nBlocks = nBlocks-1;
     // Ejecutar el kernel
     calculateDistance<<<nBlocks, nThreads>>>(n, p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
 
@@ -209,7 +210,6 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaFree(ref_points_dev_x);
     cudaFree(ref_points_dev_y);
     cudaFree(result_prediction_dev);
-
 
     // Sort the Points by distance from p
     selectionSort(result_prediction_host, ref_points_host_val, n);
@@ -231,7 +231,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaFree(freq1_dev);
     cudaFree(freq2_dev);
 
-    unsigned int result = -1;
+    int result = -1;
     if(freq1_host[0] > freq2_host[0]) result = 0;
     else result = 1;
 
@@ -274,6 +274,7 @@ void InitDefecte(int *k, struct Point *p) {
 
 int main(int argc, char** argv)
 {
+    srand(time(0));
 
     //Es declaren les variables
     int n, k;
@@ -288,6 +289,7 @@ int main(int argc, char** argv)
     //Es crea l'estructura sobre la qual es vol fer la predicció
     n = 1000; // Number of data points
     Point arr[n];
+
 
     for(int i = 0; i < n; ++i) {
         arr[i].x = rand() % 100;
@@ -308,7 +310,7 @@ int main(int argc, char** argv)
     t = clock();
     int result = classifyAPoint(arr, n, k, p);
     t = clock() - t;
-    float time_taken = ((float)t)/CLOCKS_PER_SEC; // in seconds
+    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in seconds
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
