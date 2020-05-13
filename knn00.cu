@@ -25,6 +25,29 @@ bool comparison(Point a, Point b)
     return (a.distance < b.distance); 
 } 
 
+// Used to sort an array of points by increasing 
+// order of distance 
+bool comparisonNOPoints(float a, float b) 
+{ 
+    return (a < b); 
+} 
+
+void selectionSort(float *result_prediction_host, float *ref_points_host_val, int n) {
+   int i, j, min, temp, temp2;
+   for (i = 0; i < n - 1; i++) {
+      min = i;
+      for (j = i + 1; j < n; j++)
+         if (result_prediction_host[j] < result_prediction_host[min])
+            min = j;
+      temp = result_prediction_host[i];
+      temp2 = ref_points_host_val[i];
+      result_prediction_host[i] = result_prediction_host[min];
+      ref_points_host_val[i] = ref_points_host_val[min];
+      result_prediction_host[min] = temp;
+      ref_points_host_val[min] = temp2;
+   }
+}
+
 /**
  * @param arr    refence points
  * @param n      number of reference points
@@ -57,11 +80,12 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
     return (freq1 > freq2 ? 0 : 1); 
 }
 
-void InitHostInput(Point arr[], int n, Point p, float *ref_points_host_x, float *ref_points_host_y, float *result_prediction_host) {
+void InitHostInput(Point arr[], int n, Point p, float *ref_points_host_x, float *ref_points_host_y, float *ref_points_host_val, float *result_prediction_host) {
 
     for (int i=0; i<n; i++) {
         ref_points_host_x[i] = arr[i].x;
         ref_points_host_y[i] = arr[i].y;
+        ref_points_host_val[i] = arr[i].val;
     }
     
 }
@@ -89,10 +113,12 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     
     float *ref_points_dev_x   = NULL;
     float *ref_points_dev_y   = NULL;
+    float *ref_points_dev_val   = NULL;
     float *result_prediction_dev  = NULL;
     
     float *ref_points_host_x   = NULL;
     float *ref_points_host_y = NULL;
+    float *ref_points_host_val   = NULL;
     float *result_prediction_host  = NULL;
     
     // numero de Threads
@@ -111,19 +137,22 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     // Obtener Memoria en el host
     ref_points_host_x = (float*) malloc(numBytes); 
     ref_points_host_y = (float*) malloc(numBytes); 
+    ref_points_host_val = (float*) malloc(numBytes);
     result_prediction_host = (float*) malloc(numBytes);  
     
-    InitHostInput(arr, n, p, ref_points_host_x, ref_points_host_y, result_prediction_host);
+    InitHostInput(arr, n, p, ref_points_host_x, ref_points_host_y, ref_points_host_val, result_prediction_host);
     
     // Obtener Memoria en el device
     cudaMalloc((float**)&ref_points_dev_x, numBytes); 
-    cudaMalloc((float**)&ref_points_dev_y, numBytes); 
+    cudaMalloc((float**)&ref_points_dev_y, numBytes);
+    cudaMalloc((float**)&ref_points_dev_val, numBytes);
     cudaMalloc((float**)&result_prediction_dev, numBytes); 
     
     
     // Copiar datos desde el host en el device 
     cudaMemcpy(ref_points_dev_x, ref_points_host_x, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_y, ref_points_host_y, numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(ref_points_dev_val, ref_points_host_val, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
     
     cudaEventRecord(E0, 0);
@@ -133,12 +162,6 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     
     cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     
-    for(int i = 0; i < result_prediction_dev.size(); ++i) {
-        printf("El resultat de la distància número %d és: %d", i, result_prediction_dev[i]);
-    }
-    
-    printf("Tiempo Global (00): %4.6f milseg\n", TiempoTotal);
-    
     // Obtener el resultado desde el host 
     cudaMemcpy(result_prediction_host, result_prediction_dev, numBytes, cudaMemcpyDeviceToHost);
     
@@ -146,14 +169,36 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     // Liberar Memoria del device 
     cudaFree(ref_points_dev_x);
     cudaFree(ref_points_dev_y);
+    cudaFree(ref_points_dev_val)
     cudaFree(result_prediction_dev);
+    
+    // Sort the Points by distance from p 
+    selectionSort(result_prediction_host, ref_points_host_val, n); 
+    for (int i=0; i<n; i++) {
+        printf("L'element: %d\n", i);
+        printf("La distancia: %lf\n", result_prediction_host[i]);
+        printf("La x: %lf\n", ref_points_host_val[i]);
+    }
+  
+    // Now consider the first k elements and only 
+    // two groups 
+    int freq1 = 0;     // Frequency of group 0 
+    int freq2 = 0;     // Frequency of group 1 
+    for (int i = 0; i < k; i++) 
+    { 
+        if (result_prediction_host[i].val == 0) 
+            freq1++; 
+        else if (result_prediction_host[i].val == 1) 
+            freq2++; 
+    
+    }
     
     cudaEventElapsedTime(&TiempoTotal,  E0, E3);
     printf("Invocació Kernel <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", nBlocks, nThreads, n);
     
     printf("Tiempo Global (00): %4.6f milseg\n", TiempoTotal);
         
-    free(ref_points_host_x); free(ref_points_host_y); free(result_prediction_host);
+    free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host);
       
     return 0;
     
