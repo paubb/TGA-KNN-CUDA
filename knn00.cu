@@ -120,20 +120,28 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaMalloc((float**)&ref_points_dev_y, numBytes); 
     cudaMalloc((float**)&result_prediction_dev, numBytes); 
     
-    cudaEventRecord(E0, 0);
     
     // Copiar datos desde el host en el device 
     cudaMemcpy(ref_points_dev_x, ref_points_host_x, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_y, ref_points_host_y, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
     
+    cudaEventRecord(E0, 0);
+    
     // Ejecutar el kernel 
     calculateDistance<<<nBlocks, nThreads>>>(n, p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
+    
+    cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
+    
+    for(int i = 0; i < result_prediction_dev.size(); ++i) {
+        printf("El resultat de la distància número %d és: %d", i, result_prediction_dev[i]);
+    }
+    
+    printf("Tiempo Global (00): %4.6f milseg\n", TiempoTotal);
     
     // Obtener el resultado desde el host 
     cudaMemcpy(result_prediction_host, result_prediction_dev, numBytes, cudaMemcpyDeviceToHost);
     
-    cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     
     // Liberar Memoria del device 
     cudaFree(ref_points_dev_x);
