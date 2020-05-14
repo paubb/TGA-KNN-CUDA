@@ -8,8 +8,8 @@
 #include <time.h>
 using namespace std;
 
-#define PINNED 0
-#define THREADS 100
+#define PINNED 1
+#define THREADS 1000
 
 struct Point
 {
@@ -76,6 +76,8 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
         else if (arr[i].val == 1)
             freq2++;
     }
+    printf ("freq1 is %d.\n", freq1);
+    printf ("freq2 is %d.\n", freq2);
 
     return (freq1 > freq2 ? 0 : 1);
 }
@@ -130,8 +132,8 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
-    float TiempoKernelDistance, TiempoKernelFreq;
-    cudaEvent_t E0, E1, E2, E3;
+    float TiempoKernelDistance, TiempoSort, TiempoKernelFreq, TiempoAllOperations;
+    cudaEvent_t E0, E1, E2, E3, E4, E5;
 
     double *ref_points_dev_x   = NULL;
     double *ref_points_dev_y   = NULL;
@@ -163,16 +165,19 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaEventCreate(&E1);
     cudaEventCreate(&E2);
     cudaEventCreate(&E3);
+    cudaEventCreate(&E4);
+    cudaEventCreate(&E5);
+
     if (PINNED) {
         // Obtiene Memoria [pinned] en el host
-        cudaMallocHost((float**)&ref_points_host_x, numBytes); 
-        cudaMallocHost((float**)&ref_points_host_y, numBytes); 
+        cudaMallocHost((float**)&ref_points_host_x, numBytes);
+        cudaMallocHost((float**)&ref_points_host_y, numBytes);
         cudaMallocHost((float**)&ref_points_host_val, numBytes);
         cudaMallocHost((float**)&result_prediction_host, numBytes);
-        
-        cudaMallocHost((float**)&freq1_host, sizeof(unsigned int)); 
+
+        cudaMallocHost((float**)&freq1_host, sizeof(unsigned int));
         cudaMallocHost((float**)&freq2_host, sizeof(unsigned int));
-        
+
     } else {
         // Obtener Memoria en el host
         ref_points_host_x = (double*) malloc(numBytes);
@@ -208,9 +213,10 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaMemcpy(freq2_dev, freq2_host, sizeof(unsigned int), cudaMemcpyHostToDevice);
 
     nBlocks = nBlocks-1;
-    
+
+
     cudaEventRecord(E0, 0);
-    
+
     // Ejecutar el kernel
     calculateDistance<<<nBlocks, nThreads>>>(n, p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
 
@@ -225,6 +231,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaFree(ref_points_dev_y);
     cudaFree(result_prediction_dev);
 
+    cudaEventRecord(E4, 0);
     // Sort the Points by distance from p
     selectionSort(result_prediction_host, ref_points_host_val, n);
     /*
@@ -234,12 +241,18 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
         printf("La x: %f\n", ref_points_host_val[i]);
     }
     */
+
+    cudaEventRecord(E5, 0); cudaEventSynchronize(E5);
+    cudaEventElapsedTime(&TiempoSort,  E4, E5);
+
     cudaEventRecord(E2, 0);
     // Ejecutar el kernel
     calculateFreq<<<k, 1>>>(k, ref_points_dev_val, freq1_dev, freq2_dev);
-    
+
     cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     cudaEventElapsedTime(&TiempoKernelFreq,  E2, E3);
+
+    TiempoAllOperations = TiempoKernelDistance + TiempoSort + TiempoKernelFreq;
 
     cudaMemcpy(freq1_host, freq1_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(freq2_host, freq2_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
@@ -263,18 +276,20 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 
     printf("Tiempo Kernel calculo distancia (00): %4.6f milseg\n", TiempoKernelDistance);
     printf("Tiempo Kernel calculo freq (00): %4.6f milseg\n", TiempoKernelFreq);
-    
+    printf("Tiempo Sort (00): %4.6f milseg\n", TiempoSort);
+    printf("Tiempo todas las operaciones (00): %4.6f milseg\n", TiempoAllOperations);
+
     if (PINNED) printf("Usando Pinned Memory\n");
     else printf("NO usa Pinned Memory\n");
-         
+
     if (PINNED) {
         cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);cudaFreeHost(result_prediction_host); cudaFreeHost(freq1_host); cudaFreeHost(freq2_host);
     } else {
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq1_host); free(freq2_host);
     }
-    
+
     cudaDeviceReset();
-    
+
     return result;
 
 }
@@ -314,7 +329,7 @@ int main(int argc, char** argv)
     else { printf("Usage: ./exe k TestPointCoordenadaX TestPointCoordenadaY\n"); exit(0); }
 
     //Es crea l'estructura sobre la qual es vol fer la predicció
-    n = 1000; // Number of data points
+    n = 10000; // Number of data points
     Point arr[n];
 
 
@@ -332,6 +347,10 @@ int main(int argc, char** argv)
     printf(" y = %f", p.y);
     printf("\n");
 
+    printf("\n");
+    printf("Programa Seqüencial -------------------------------------------------- \n");
+    printf("\n");
+
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t;
     t = clock();
@@ -342,10 +361,12 @@ int main(int argc, char** argv)
     printf ("The value classified to unknown point"
             " is %d.\n", result);
 
-    printf ("Temps seqüencial:"
-            " is %lf.\n", time_taken);
+    printf ("Temps total seqüencial:"
+            " %lf milseg.\n", time_taken);
 
-    printf("---------------------------------------------------------------------- \n");
+    printf("\n");
+    printf("Programa CUDA -------------------------------------------------------- \n");
+    printf("\n");
 
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t2;
@@ -357,7 +378,6 @@ int main(int argc, char** argv)
     printf ("The value classified to unknown point"
             " is %d.\n", result2);
 
-    printf ("Temps CUDA:"
-            " is %lf.\n", time_taken2);
-
+    printf ("Temps total CUDA:"
+            " %lf seg.\n", time_taken2);
 }
