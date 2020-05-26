@@ -282,8 +282,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaMalloc((float**)&ref_points_dev_val, numBytes);
     cudaMalloc((float**)&result_prediction_dev, nBytes_sort);
 
-    cudaMallocHost((float **) &arrSorted_d, nBytes_sort);
-    cudaMallocHost((float **) &arrSortedF_d, nBytes_sort);
+    cudaMalloc((float **) &arrSorted_d, nBytes_sort);
+    cudaMalloc((float **) &arrSortedF_d, nBytes_sort);
 
     cudaMalloc((unsigned int**)&freq_dev, sizeof(unsigned int)*2);
 
@@ -291,7 +291,6 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaMemcpy(ref_points_dev_x, ref_points_host_x, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_y, ref_points_host_y, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_val, ref_points_host_val, numBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(result_prediction_dev, result_prediction_host,nBytes_sort, cudaMemcpyHostToDevice);
 
     cudaMemcpy(freq_dev, freq_host, sizeof(unsigned int)*2, cudaMemcpyHostToDevice);
 
@@ -324,11 +323,12 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaFree(result_prediction_dev);
 
     while (auxChunkSize < n) {
-       //printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
+        //printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
        callMerge<<<auxBlock, auxThread>>>(arrSorted_d, arrSortedF_d, auxChunkSize, n);
        auxChunkSize = auxChunkSize*2;
        auxThread = auxThread/2;
     }
+
     cudaMemcpy(arrSorted_h, arrSortedF_d, nBytes_sort, cudaMemcpyDeviceToHost);
 
     cudaFree(arrSorted_d);
@@ -392,7 +392,6 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         free(arrSorted_h); free(arrSortedF_h); free(freq_host);
     }
 
-    cudaDeviceReset();
 
     return result;
 
@@ -436,13 +435,21 @@ int main(int argc, char** argv)
     n = 131072; // Number of data points
     Point arr[n];
 
-    float val[n];
+    float val_seq[n];
+    float val_cuda[n];
 
     for(int i = 0; i < n; ++i) {
         arr[i].x = rand();
         arr[i].y = rand();
-        val[i] = rand() % 2;
+        val_seq[i] = rand() % 2;
+        val_cuda[i] = val_seq[i];
     }
+
+    /*for(int i = 0; i < n; i++){
+        printf("x: %lf\n", arr[i].x);
+        printf("y: %lf\n", arr[i].y);
+        printf("val: %f\n", val[i]);
+    }*/
 
     printf("k = %d \n", k);
 
@@ -459,9 +466,9 @@ int main(int argc, char** argv)
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t;
     t = clock();
-    int result = classifyAPoint(arr, n, k, p, val);
+    int result = classifyAPoint(arr, n, k, p, val_seq);
     t = clock() - t;
-    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in seconds
+    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in mseconds
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
@@ -476,13 +483,13 @@ int main(int argc, char** argv)
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t2;
     t2 = clock();
-    int result2 = classifyAPointCUDA(arr,val, n, k, p);
+    int result2 = classifyAPointCUDA(arr,val_cuda, n, k, p);
     t2 = clock() - t2;
-    float time_taken2 = ((float)t2)/CLOCKS_PER_SEC; // in seconds
+    float time_taken2 = ((float)t2)/(CLOCKS_PER_SEC/1000); // in mseconds
 
     printf ("The value classified to unknown point"
             " is %d.\n", result2);
 
     printf ("Temps total CUDA:"
-            " %lf seg.\n", time_taken2);
+            " %lf milseg.\n", time_taken2);
 }
