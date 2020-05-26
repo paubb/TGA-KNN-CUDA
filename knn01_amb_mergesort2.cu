@@ -9,9 +9,9 @@
 using namespace std;
 
 #define PINNED 0
-#define THREADS 1000
+#define THREADS 1024
 
-__device__ void mergeDevice(int *list, int *sorted, int start, int mid, int end)
+__device__ void mergeDevice(float *list, float *sorted, int start, int mid, int end)
 {
     int ti=start, i=start, j=mid;
     while (i<mid || j<end)
@@ -27,37 +27,37 @@ __device__ void mergeDevice(int *list, int *sorted, int start, int mid, int end)
         list[ti] = sorted[ti];
 }
 
-__device__ void mergeSortKernel(int *list, int *sorted, int start, int end)
-{   
+__device__ void mergeSortKernel(float *list, float *sorted, int start, int end)
+{
     //Final 1: hi ha mes threads que elements del vector
     if (end-start<2)
         return;
-  
+
     mergeSortKernel(list, sorted, start, start + (end-start)/2);
     mergeSortKernel(list, sorted, start + (end-start)/2, end);
     mergeDevice(list, sorted, start, start + (end-start)/2, end);
 }
 
-__global__ void callMerge(int *list, int *sorted, int chunkSize, int N) {
-  	if (chunkSize >= N)
-		return;	
-	int tid = blockIdx.x*blockDim.x + threadIdx.x;
-	int start = tid*chunkSize;
-	int end = start + chunkSize;
-	if (end > N) {
-		end = N;
-	}
-	mergeDevice(list, sorted, start, start + (end-start)/2, end);
+__global__ void callMerge(float *list, float *sorted, int chunkSize, int N) {
+      if (chunkSize >= N)
+        return;
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    int start = tid*chunkSize;
+    int end = start + chunkSize;
+    if (end > N) {
+        end = N;
+    }
+    mergeDevice(list, sorted, start, start + (end-start)/2, end);
 }
 
-__global__ void callMergeSort(int *list, int *sorted, int chunkSize, int N) {
-	int tid = blockIdx.x*blockDim.x + threadIdx.x;
-	int start = tid*chunkSize;
-	int end = start + chunkSize;
-	if (end > N) {
-		end = N;
-	}
-	mergeSortKernel(list, sorted, start, end);
+__global__ void callMergeSort(float *list, float *sorted, int chunkSize, int N) {
+    int tid = blockIdx.x*blockDim.x + threadIdx.x;
+    int start = tid*chunkSize;
+    int end = start + chunkSize;
+    if (end > N) {
+        end = N;
+    }
+    mergeSortKernel(list, sorted, start, end);
 }
 
 struct Point
@@ -199,7 +199,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
-    
+
     int chunkSize_sort;
     unsigned int nBytes_sort;
     unsigned int nBlocks_sort, nThreads_sort;
@@ -216,7 +216,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     float *ref_points_host_y = NULL;
     float *ref_points_host_val   = NULL;
     float *result_prediction_host  = NULL;
-    
+
     float *arrSorted_h, *arrSortedF_h;
     float *arrSorted_d, *arrSortedF_d;
 
@@ -233,7 +233,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     numBytes = nBlocks * nThreads * sizeof(float);
     printf("numBytes = %d \n", numBytes);
-    
+
     nThreads_sort = 128;
     nBlocks_sort = 32;
     chunkSize_sort = n/(nThreads_sort*nBlocks_sort);
@@ -251,8 +251,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         cudaMallocHost((float**)&ref_points_host_x, numBytes);
         cudaMallocHost((float**)&ref_points_host_y, numBytes);
         cudaMallocHost((float**)&ref_points_host_val, numBytes);
-        cudaMallocHost((float**)&result_prediction_host, numBytes);
-        
+        cudaMallocHost((float**)&result_prediction_host, nBytes_sort);
+
         cudaMallocHost((float**)&arrSorted_h, nBytes_sort);
         cudaMallocHost((float**)&arrSortedF_h, nBytes_sort);
 
@@ -264,8 +264,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         ref_points_host_x = (float*) malloc(numBytes);
         ref_points_host_y = (float*) malloc(numBytes);
         ref_points_host_val = (float*) malloc(numBytes);
-        result_prediction_host = (float*) malloc(numBytes);
-        
+        result_prediction_host = (float*) malloc(nBytes_sort);
+
         arrSorted_h = (float*) malloc(nBytes_sort);
         arrSortedF_h = (float*) malloc(nBytes_sort);
 
@@ -280,10 +280,10 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaMalloc((float**)&ref_points_dev_x, numBytes);
     cudaMalloc((float**)&ref_points_dev_y, numBytes);
     cudaMalloc((float**)&ref_points_dev_val, numBytes);
-    cudaMalloc((float**)&result_prediction_dev, numBytes);
-    
-    cudaMallocHost((float **) &arrSorted_h, nBytes_sort);
-    cudaMallocHost((float **) &arrSortedF_h, nBytes_sort);
+    cudaMalloc((float**)&result_prediction_dev, nBytes_sort);
+
+    cudaMallocHost((float **) &arrSorted_d, nBytes_sort);
+    cudaMallocHost((float **) &arrSortedF_d, nBytes_sort);
 
     cudaMalloc((unsigned int**)&freq_dev, sizeof(unsigned int)*2);
 
@@ -291,7 +291,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaMemcpy(ref_points_dev_x, ref_points_host_x, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_y, ref_points_host_y, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(ref_points_dev_val, ref_points_host_val, numBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(result_prediction_dev, result_prediction_host,nBytes_sort, cudaMemcpyHostToDevice);
 
     cudaMemcpy(freq_dev, freq_host, sizeof(unsigned int)*2, cudaMemcpyHostToDevice);
 
@@ -312,24 +312,31 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     // Liberar Memoria del device
     cudaFree(ref_points_dev_x);
     cudaFree(ref_points_dev_y);
-    
+
 
     cudaEventRecord(E4, 0);
     // Sort the Points by distance from p
+
+    printf("Invocació Kernel Sort <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", nBlocks_sort, nThreads_sort, n);
+
     callMergeSort<<<nBlocks_sort, nThreads_sort>>>(result_prediction_dev, arrSorted_d,chunkSize_sort, n);
     int auxChunkSize = chunkSize_sort*2;
     int auxBlock = nBlocks_sort;
     int auxThread = nThreads_sort/2;
+
+    cudaFree(result_prediction_dev);
+
     while (auxChunkSize < n) {
+        printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
        callMerge<<<auxBlock, auxThread>>>(arrSorted_d, arrSortedF_d, auxChunkSize, n);
        auxChunkSize = auxChunkSize*2;
        auxThread = auxThread/2;
     }
-    //cudaMemcpy(arrSorted_h, arrSortedF_d, nBytes, cudaMemcpyDeviceToHost);
-    
-    cudaFree(result_prediction_dev);
+    cudaMemcpy(arrSorted_h, arrSortedF_d, nBytes_sort, cudaMemcpyDeviceToHost);
+
     cudaFree(arrSorted_d);
     cudaFree(arrSortedF_d);
+
     //quickSort(result_prediction_host, ref_points_host_val, 0, n-1);
     /*
         for(int i = 0; i < n; i++){
@@ -357,7 +364,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     cudaFree(ref_points_dev_val);
     cudaFree(freq_dev);
-    
+
 
     int result = -1;
     if(freq_host[0] > freq_host[1]) result = 0;
@@ -381,9 +388,11 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     else printf("NO usa Pinned Memory\n");
 
     if (PINNED) {
-        cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host);
+        cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);
+        cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h);
     } else {
-        free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq_host);
+        free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host);
+        free(arrSorted_h); free(arrSortedF_h); free(freq_host);
     }
 
     cudaDeviceReset();
@@ -427,7 +436,7 @@ int main(int argc, char** argv)
     else { printf("Usage: ./exe k TestPointCoordenadaX TestPointCoordenadaY\n"); exit(0); }
 
     //Es crea l'estructura sobre la qual es vol fer la predicció
-    n = 100000; // Number of data points
+    n = 131072; // Number of data points
     Point arr[n];
 
     float val[n];
