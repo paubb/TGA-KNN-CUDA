@@ -295,9 +295,6 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     cudaMemcpy(freq_dev, freq_host, sizeof(unsigned int)*2, cudaMemcpyHostToDevice);
 
-    nBlocks = nBlocks-1;
-
-
     cudaEventRecord(E0, 0);
 
     // Ejecutar el kernel
@@ -327,7 +324,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaFree(result_prediction_dev);
 
     while (auxChunkSize < n) {
-        printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
+       //printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
        callMerge<<<auxBlock, auxThread>>>(arrSorted_d, arrSortedF_d, auxChunkSize, n);
        auxChunkSize = auxChunkSize*2;
        auxThread = auxThread/2;
