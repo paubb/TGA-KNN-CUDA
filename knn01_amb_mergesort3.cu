@@ -25,13 +25,13 @@ __device__ void mergeDevice(float *list, float *sorted, float *list2, float *sor
             sorted2[ti] = list2[j++];
         }
         else if (list[i]<list[j]) {
-            sorted[ti] = list[i++];
-            sorted2[ti] = list2[i++];
-        }
+         sorted[ti] = list[i++];
+        sorted2[ti] = list2[i++];
+    }
         else {
-            sorted[ti] = list[j++];
-            sorted2[ti] = list2[j++];
-        }
+        sorted[ti] = list[j++];
+        sorted2[ti] = list2[j++];
+    }
         ti++;
     }
 
@@ -52,7 +52,7 @@ __device__ void mergeSortKernel(float *list, float *sorted, float *list2, float 
     mergeDevice(list, sorted, list2, sorted2, start, start + (end-start)/2, end);
 }
 
-__global__ void callMerge(float *list, float *sorted,  float *list2, float *sorted2, int chunkSize, int N) {
+__global__ void callMerge(float *list, float *sorted, float *list2, float *sorted2, int chunkSize, int N) {
       if (chunkSize >= N)
         return;
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -64,7 +64,7 @@ __global__ void callMerge(float *list, float *sorted,  float *list2, float *sort
     mergeDevice(list, sorted, list2, sorted2, start, start + (end-start)/2, end);
 }
 
-__global__ void callMergeSort(float *list, float *sorted,  float *list2, float *sorted2, int chunkSize, int N) {
+__global__ void callMergeSort(float *list, float *sorted, float *list2, float *sorted2, int chunkSize, int N) {
     int tid = blockIdx.x*blockDim.x + threadIdx.x;
     int start = tid*chunkSize;
     int end = start + chunkSize;
@@ -233,6 +233,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     float *arrSorted_h, *arrSortedF_h;
     float *arrSorted_d, *arrSortedF_d;
+    float *arrSorted2_h, *arrSortedF2_h;
     float *arrSorted2_d, *arrSortedF2_d;
 
     unsigned int *freq_dev = NULL;
@@ -283,6 +284,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
         arrSorted_h = (float*) malloc(nBytes_sort);
         arrSortedF_h = (float*) malloc(nBytes_sort);
+        arrSorted2_h = (float*) malloc(nBytes_sort);
+        arrSortedF2_h = (float*) malloc(nBytes_sort);
 
         freq_host = (unsigned int*) malloc(sizeof(unsigned int)*2);
     }
@@ -339,7 +342,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     cudaFree(result_prediction_dev);
     cudaFree(ref_points_dev_val);
-    
+
     while (auxChunkSize < n) {
         //printf("Invocació Kernel Sort 2 <<<nBlocks, nKernels>>> (N): <<<%d, %d>>> (%d)\n", auxBlock, auxThread, n);
        callMerge<<<auxBlock, auxThread>>>(arrSorted_d, arrSortedF_d, arrSorted2_d, arrSortedF2_d, auxChunkSize, n);
@@ -350,7 +353,6 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     //cudaMemcpy(arrSorted_h, arrSortedF_d, nBytes_sort, cudaMemcpyDeviceToHost);
 
     cudaFree(arrSorted_d);
-    cudaFree(arrSorted2_d);
     cudaFree(arrSortedF_d);
 
     //quickSort(result_prediction_host, ref_points_host_val, 0, n-1);
@@ -377,7 +379,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     cudaMemcpy(freq_host, freq_dev, sizeof(unsigned int)*2, cudaMemcpyDeviceToHost);
 
-    cudaFree(arrSortedF2_d);
+
     cudaFree(ref_points_dev_val);
     cudaFree(freq_dev);
 
@@ -405,7 +407,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     if (PINNED) {
         cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);
-        cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h);
+        cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h);
     } else {
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host);
         free(arrSorted_h); free(arrSortedF_h); free(freq_host); free(arrSorted2_h); free(arrSortedF2_h);
