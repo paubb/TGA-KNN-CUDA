@@ -8,28 +8,67 @@
 #include <time.h>
 using namespace std;
 
-#define PINNED 1
+#define PINNED 0
 #define THREADS 1000
 
 struct Point
 {
-    double x, y;     // Co-ordinate of point
+    float x, y;     // Co-ordinate of point
 };
 
-void selectionSort(double *result_prediction_host, double *ref_points_host_val, int n) {
-   int i, j, min, temp, temp2;
-   for (i = 0; i < n - 1; i++) {
-      min = i;
-      for (j = i + 1; j < n; j++)
-         if (result_prediction_host[j] < result_prediction_host[min])
-            min = j;
-      temp = result_prediction_host[i];
-      temp2 = ref_points_host_val[i];
-      result_prediction_host[i] = result_prediction_host[min];
-      ref_points_host_val[i] = ref_points_host_val[min];
-      result_prediction_host[min] = temp;
-      ref_points_host_val[min] = temp2;
-   }
+
+// A utility function to swap two elements
+void swap(float* a, float* b, float* c, float* d)
+{
+    int t = *a;
+    int t2 = *c;
+    *a = *b;
+    *c = *d;
+    *b = t;
+    *d = t2;
+}
+
+/* This function takes last element as pivot, places
+   the pivot element at its correct position in sorted
+    array, and places all smaller (smaller than pivot)
+   to left of pivot and all greater elements to right
+   of pivot */
+int partition (float *result_prediction_host, float *ref_points_host_val, int low, int high)
+{
+    int pivot = result_prediction_host[high];    // pivot
+    int i = (low - 1);  // Index of smaller element
+
+    for (int j = low; j <= high- 1; j++)
+    {
+        // If current element is smaller than or
+        // equal to pivot
+        if (result_prediction_host[j] <= pivot)
+        {
+            i++;    // increment index of smaller element
+            swap(&result_prediction_host[i], &result_prediction_host[j], &ref_points_host_val[i], &ref_points_host_val[j]);
+        }
+    }
+    swap(&result_prediction_host[i + 1], &result_prediction_host[high], &ref_points_host_val[i + 1], &ref_points_host_val[high]);
+    return (i + 1);
+}
+
+/* The main function that implements QuickSort
+ arr[] --> Array to be sorted,
+  low  --> Starting index,
+  high  --> Ending index */
+void quickSort(float *result_prediction_host, float *ref_points_host_val, int low, int high)
+{
+    if (low < high)
+    {
+        /* pi is partitioning index, arr[p] is now
+           at right place */
+        int pi = partition(result_prediction_host, ref_points_host_val, low, high);
+
+        // Separately sort elements before
+        // partition and after partition
+        quickSort(result_prediction_host, ref_points_host_val, low, pi - 1);
+        quickSort(result_prediction_host, ref_points_host_val, pi + 1, high);
+    }
 }
 
 /**
@@ -38,9 +77,9 @@ void selectionSort(double *result_prediction_host, double *ref_points_host_val, 
  * @param k      number of points we want to use for the prediction
  * @param p      point we want to predict
  */
-int classifyAPoint(Point arr[], int n, int k, Point p, double val[])
+int classifyAPoint(Point arr[], int n, int k, Point p, float val[])
 {
-    double distances[n];
+    float distances[n];
 
     // Fill distances of all points from p
     for (int i = 0; i < n; i++)
@@ -49,7 +88,7 @@ int classifyAPoint(Point arr[], int n, int k, Point p, double val[])
                  (arr[i].y - p.y) * (arr[i].y - p.y));
 
     // Sort the Points by distance from p
-    selectionSort(distances, val, n);
+    quickSort(distances, val, 0, n-1);
 
     // Now consider the first k elements and only
     // two groups
@@ -68,7 +107,7 @@ int classifyAPoint(Point arr[], int n, int k, Point p, double val[])
     return (freq1 > freq2 ? 0 : 1);
 }
 
-void InitHostInput(Point arr[], int n, double val[], Point p, double *ref_points_host_x, double *ref_points_host_y, double *ref_points_host_val) {
+void InitHostInput(Point arr[], int n, float val[], Point p, float *ref_points_host_x, float *ref_points_host_y, float *ref_points_host_val) {
 
     for (int i=0; i<n; i++) {
         ref_points_host_x[i] = arr[i].x;
@@ -78,14 +117,14 @@ void InitHostInput(Point arr[], int n, double val[], Point p, double *ref_points
 
 }
 
-void InitHostFreq(unsigned int *freq1_host, unsigned int *freq2_host) {
+void InitHostFreq(unsigned int *freq_host) {
 
-    freq1_host[0] = 0;
-    freq2_host[0] = 0;
+    freq_host[0] = 0;
+    freq_host[1] = 0;
 
 }
 
-__global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, double *ref_points_dev_y, double *result_prediction_dev) {
+__global__ void calculateDistance(Point p, float *ref_points_dev_x, float *ref_points_dev_y, float *result_prediction_dev) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     // Fill distances of all points from p
@@ -97,24 +136,18 @@ __global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, doub
 
 }
 
-__global__ void calculateFreq(int k, double *ref_points_host_val, unsigned int *freq1_dev, unsigned int *freq2_dev) {
+__global__ void calculateFreq(float *ref_points_host_val, unsigned int *freq_dev) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(i < k) {
-        if (ref_points_host_val[i] == 0) {
-            atomicAdd(&freq1_dev[0], 1);
-        }
-        else if (ref_points_host_val[i] == 1) {
-            atomicAdd(&freq2_dev[0], 1);
 
-        }
-    }
+        int j = ref_points_host_val[i];
+            atomicAdd(&freq_dev[j], 1);
 }
 
-int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
+int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 {
-    unsigned int N;
+
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
@@ -132,20 +165,18 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
 
     cudaEventRecord(E6, 0);
 
-    double *ref_points_dev_x   = NULL;
-    double *ref_points_dev_y   = NULL;
-    double *ref_points_dev_val   = NULL;
-    double *result_prediction_dev  = NULL;
+    float *ref_points_dev_x   = NULL;
+    float *ref_points_dev_y   = NULL;
+    float *ref_points_dev_val   = NULL;
+    float *result_prediction_dev  = NULL;
 
-    double *ref_points_host_x   = NULL;
-    double *ref_points_host_y = NULL;
-    double *ref_points_host_val   = NULL;
-    double *result_prediction_host  = NULL;
+    float *ref_points_host_x   = NULL;
+    float *ref_points_host_y = NULL;
+    float *ref_points_host_val   = NULL;
+    float *result_prediction_host  = NULL;
 
-    unsigned int *freq1_dev = NULL;
-    unsigned int *freq2_dev = NULL;
-    unsigned int *freq1_host = NULL;
-    unsigned int *freq2_host = NULL;
+    unsigned int *freq_dev = NULL;
+    unsigned int *freq_host = NULL;
 
 
     // numero de Threads
@@ -155,7 +186,7 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
     nBlocks = (n+nThreads-1)/nThreads;
     printf("nBlocks = %d \n", nBlocks);
 
-    numBytes = nBlocks * nThreads * sizeof(double);
+    numBytes = nBlocks * nThreads * sizeof(float);
     printf("numBytes = %d \n", numBytes);
 
     if (PINNED) {
@@ -165,32 +196,31 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
         cudaMallocHost((float**)&ref_points_host_val, numBytes);
         cudaMallocHost((float**)&result_prediction_host, numBytes);
 
-        cudaMallocHost((float**)&freq1_host, sizeof(unsigned int));
-        cudaMallocHost((float**)&freq2_host, sizeof(unsigned int));
+        cudaMallocHost((float**)&freq_host, sizeof(unsigned int)*2);
+
 
     } else {
         // Obtener Memoria en el host
-        ref_points_host_x = (double*) malloc(numBytes);
-        ref_points_host_y = (double*) malloc(numBytes);
-        ref_points_host_val = (double*) malloc(numBytes);
-        result_prediction_host = (double*) malloc(numBytes);
+        ref_points_host_x = (float*) malloc(numBytes);
+        ref_points_host_y = (float*) malloc(numBytes);
+        ref_points_host_val = (float*) malloc(numBytes);
+        result_prediction_host = (float*) malloc(numBytes);
 
-        freq1_host = (unsigned int*) malloc(sizeof(unsigned int));
-        freq2_host = (unsigned int*) malloc(sizeof(unsigned int));
+        freq_host = (unsigned int*) malloc(sizeof(unsigned int)*2);
     }
 
     InitHostInput(arr, n, val, p, ref_points_host_x, ref_points_host_y, ref_points_host_val);
 
-    InitHostFreq(freq1_host, freq2_host);
+    InitHostFreq(freq_host);
 
     // Obtener Memoria en el device
-    cudaMalloc((double**)&ref_points_dev_x, numBytes);
-    cudaMalloc((double**)&ref_points_dev_y, numBytes);
-    cudaMalloc((double**)&ref_points_dev_val, numBytes);
-    cudaMalloc((double**)&result_prediction_dev, numBytes);
+    cudaMalloc((float**)&ref_points_dev_x, numBytes);
+    cudaMalloc((float**)&ref_points_dev_y, numBytes);
+    cudaMalloc((float**)&ref_points_dev_val, numBytes);
+    cudaMalloc((float**)&result_prediction_dev, numBytes);
 
-    cudaMalloc((unsigned int**)&freq1_dev, sizeof(unsigned int));
-    cudaMalloc((unsigned int**)&freq2_dev, sizeof(unsigned int));
+    cudaMalloc((unsigned int**)&freq_dev, sizeof(unsigned int)*2);
+
 
 
     // Copiar datos desde el host en el device
@@ -199,8 +229,7 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
     cudaMemcpy(ref_points_dev_val, ref_points_host_val, numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(result_prediction_dev, result_prediction_host,numBytes, cudaMemcpyHostToDevice);
 
-    cudaMemcpy(freq1_dev, freq1_host, sizeof(unsigned int), cudaMemcpyHostToDevice);
-    cudaMemcpy(freq2_dev, freq2_host, sizeof(unsigned int), cudaMemcpyHostToDevice);
+    cudaMemcpy(freq_dev, freq_host, sizeof(unsigned int)*2, cudaMemcpyHostToDevice);
 
     nBlocks = nBlocks-1;
 
@@ -208,7 +237,7 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
     cudaEventRecord(E0, 0);
 
     // Ejecutar el kernel
-    calculateDistance<<<nBlocks, nThreads>>>(n, p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
+    calculateDistance<<<nBlocks, nThreads>>>(p, ref_points_dev_x, ref_points_dev_y, result_prediction_dev);
 
     cudaEventRecord(E1, 0); cudaEventSynchronize(E1);
     cudaEventElapsedTime(&TiempoKernelDistance,  E0, E1);
@@ -223,33 +252,34 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
 
     cudaEventRecord(E4, 0);
     // Sort the Points by distance from p
-    selectionSort(result_prediction_host, ref_points_host_val, n);
+    quickSort(result_prediction_host, ref_points_host_val, 0, n-1);
 
     cudaEventRecord(E5, 0); cudaEventSynchronize(E5);
     cudaEventElapsedTime(&TiempoSort,  E4, E5);
 
     cudaEventRecord(E2, 0);
+
     // Ejecutar el kernel
-    calculateFreq<<<k, 1>>>(k, ref_points_dev_val, freq1_dev, freq2_dev);
+    calculateFreq<<<k, 1>>>(ref_points_dev_val, freq_dev);
 
     cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     cudaEventElapsedTime(&TiempoKernelFreq,  E2, E3);
 
     TiempoAllOperations = TiempoKernelDistance + TiempoSort + TiempoKernelFreq;
 
-    cudaMemcpy(freq1_host, freq1_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(freq2_host, freq2_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(freq_host, freq_dev, sizeof(unsigned int)*2, cudaMemcpyDeviceToHost);
+
 
     cudaFree(ref_points_dev_val);
-    cudaFree(freq1_dev);
-    cudaFree(freq2_dev);
+    cudaFree(freq_dev);
+
 
     int result = -1;
-    if(freq1_host[0] > freq2_host[0]) result = 0;
+    if(freq_host[0] > freq_host[1]) result = 0;
     else result = 1;
 
-    printf ("freq1 is %d.\n", freq1_host[0]);
-    printf ("freq2 is %d.\n", freq2_host[0]);
+    printf ("freq1 is %d.\n", freq_host[0]);
+    printf ("freq2 is %d.\n", freq_host[1]);
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
@@ -266,13 +296,13 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
     else printf("NO usa Pinned Memory\n");
 
     if (PINNED) {
-        cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);cudaFreeHost(result_prediction_host); cudaFreeHost(freq1_host); cudaFreeHost(freq2_host);
+        cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host);
     } else {
-        free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq1_host); free(freq2_host);
+        free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq_host);
     }
 
     cudaDeviceReset();
-    
+	
     cudaEventRecord(E7, 0); cudaEventSynchronize(E7);
     cudaEventElapsedTime(&TiempoProva,  E6, E7);
 
@@ -317,14 +347,14 @@ int main(int argc, char** argv)
     else { printf("Usage: ./exe k TestPointCoordenadaX TestPointCoordenadaY\n"); exit(0); }
 
     //Es crea l'estructura sobre la qual es vol fer la predicció
-    n = 10000; // Number of data points
+    n = 100000; // Number of data points
     Point arr[n];
 
-    double val[n];
+    float val[n];
 
     for(int i = 0; i < n; ++i) {
-        arr[i].x = rand() % 100;
-        arr[i].y = rand() % 100;
+        arr[i].x = rand();
+        arr[i].y = rand();
         val[i] = rand() % 2;
     }
 
