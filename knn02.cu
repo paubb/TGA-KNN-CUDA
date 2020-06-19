@@ -38,18 +38,17 @@ void selectionSort(float *result_prediction_host, float *ref_points_host_val, in
  * @param k      number of points we want to use for the prediction
  * @param p      point we want to predict
  */
-int classifyAPoint(Point arr[], int n, int k, Point p, float val[])
+int classifyAPoint(Point arr[], float *val, int n, int k, Point p)
 {
-    float distances[n];
-
+	float distance[n];
     // Fill distances of all points from p
     for (int i = 0; i < n; i++)
-        distances[i] =
+        distance[i] =
             sqrt((arr[i].x - p.x) * (arr[i].x - p.x) +
                  (arr[i].y - p.y) * (arr[i].y - p.y));
 
     // Sort the Points by distance from p
-    selectionSort(distances, val, n);
+    selectionSort(distance, val, n);
 
     // Now consider the first k elements and only
     // two groups
@@ -62,13 +61,14 @@ int classifyAPoint(Point arr[], int n, int k, Point p, float val[])
         else if (val[i] == 1)
             freq2++;
     }
+	
     printf ("freq1 is %d.\n", freq1);
     printf ("freq2 is %d.\n", freq2);
 
     return (freq1 > freq2 ? 0 : 1);
 }
 
-void InitHostInput(Point arr[], int n, float val[], Point p, float *ref_points_host_x, float *ref_points_host_y, float *ref_points_host_val) {
+void InitHostInput(Point arr[], float *val, int n, Point p, float *ref_points_host_x, float *ref_points_host_y, float *ref_points_host_val) {
 
     for (int i=0; i<n; i++) {
         ref_points_host_x[i] = arr[i].x;
@@ -112,8 +112,9 @@ __global__ void calculateFreq(int k, float *ref_points_host_val, unsigned int *f
     }
 }
 
-int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
+int classifyAPointCUDA(Point arr[], float *val, int n, int k, Point p)
 {
+    unsigned int N;
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
@@ -154,7 +155,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     nBlocks = (n+nThreads-1)/nThreads;
     printf("nBlocks = %d \n", nBlocks);
 
-    numBytes = nBlocks * nThreads * sizeof(double);
+    numBytes = nBlocks * nThreads * sizeof(float);
     printf("numBytes = %d \n", numBytes);
 
     if (PINNED) {
@@ -164,8 +165,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         cudaMallocHost((float**)&ref_points_host_val, numBytes);
         cudaMallocHost((float**)&result_prediction_host, numBytes);
 
-        cudaMallocHost((float**)&freq1_host, sizeof(unsigned int));
-        cudaMallocHost((float**)&freq2_host, sizeof(unsigned int));
+        cudaMallocHost((unsigned int**)&freq1_host, sizeof(unsigned int));
+        cudaMallocHost((unsigned int**)&freq2_host, sizeof(unsigned int));
 
     } else {
         // Obtener Memoria en el host
@@ -178,7 +179,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         freq2_host = (unsigned int*) malloc(sizeof(unsigned int));
     }
 
-    InitHostInput(arr, n, val, p, ref_points_host_x, ref_points_host_y, ref_points_host_val);
+    InitHostInput(arr,val, n, p, ref_points_host_x, ref_points_host_y, ref_points_host_val);
 
     InitHostFreq(freq1_host, freq2_host);
 
@@ -221,6 +222,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
     cudaFree(result_prediction_dev);
 
     cudaEventRecord(E4, 0);
+    
     // Sort the Points by distance from p
     selectionSort(result_prediction_host, ref_points_host_val, n);
 
@@ -270,15 +272,12 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq1_host); free(freq2_host);
     }
 
-    
-    
     cudaEventRecord(E7, 0); cudaEventSynchronize(E7);
     cudaEventElapsedTime(&TiempoProva,  E6, E7);
 
     printf("Temps total CUDA: %4.6f milseg\n", TiempoProva);
 
     return result;
-
 }
 
 void InitKDefecte(int *k) {
@@ -318,15 +317,15 @@ int main(int argc, char** argv)
     //Es crea l'estructura sobre la qual es vol fer la predicció
     n = 10000; // Number of data points
     Point arr[n];
-
-    float val[n];
-	float val2[n];
+	
+	float val[n];
+	float val_cuda[n];
 
     for(int i = 0; i < n; ++i) {
         arr[i].x = rand() % 100;
         arr[i].y = rand() % 100;
         val[i] = rand() % 2;
-	val2[i] = val[i];
+	val_cuda[i] = val[i];
     }
 
     printf("k = %d \n", k);
@@ -344,9 +343,9 @@ int main(int argc, char** argv)
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t;
     t = clock();
-    int result = classifyAPoint(arr, n, k, p, val);
+    int result = classifyAPoint(arr,val, n, k, p);
     t = clock() - t;
-    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in seconds
+    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in mseconds
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
@@ -358,7 +357,7 @@ int main(int argc, char** argv)
     printf("Programa CUDA -------------------------------------------------------- \n");
     printf("\n");
 
-    int result2 = classifyAPointCUDA(arr, val2, n, k, p);
+    int result2 = classifyAPointCUDA(arr,val_cuda, n, k, p);
     
 	printf ("The value classified to unknown point"
             " is %d.\n", result2);
