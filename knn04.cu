@@ -528,7 +528,7 @@ int main(int argc, char** argv)
     else { printf("Usage: ./exe k TestPointCoordenadaX TestPointCoordenadaY\n"); exit(0); }
 
     //Es crea l'estructura sobre la qual es vol fer la predicció
-    n = 131072*2; // Number of data points
+    n = 131072; // Number of data points
     Point arr[n];
 
     float val_seq[n];
