@@ -128,7 +128,6 @@ __global__ void calculateFreq(int k, double *ref_points_host_val, unsigned int *
 
 int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 {
-    unsigned int N;
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
