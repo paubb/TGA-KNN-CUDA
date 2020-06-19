@@ -334,7 +334,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         cudaMallocHost((float**)&arrSorted_h, nBytes_sort);
         cudaMallocHost((float**)&arrSortedF_h, nBytes_sort);
 
-        cudaMallocHost((float**)&freq_host, sizeof(unsigned int)*2);
+        cudaMallocHost((unsigned int**)&freq_host, sizeof(unsigned int)*2);
 
 
     } else {
