@@ -129,6 +129,7 @@ __global__ void calculateFreq(int k, double *ref_points_host_val, unsigned int *
 
 int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 {
+    unsigned int N;
     unsigned int numBytes;
     unsigned int nBlocks, nThreads;
 
@@ -174,13 +175,13 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 
     if (PINNED) {
         // Obtiene Memoria [pinned] en el host
-        cudaMallocHost((float**)&ref_points_host_x, numBytes);
-        cudaMallocHost((float**)&ref_points_host_y, numBytes);
-        cudaMallocHost((float**)&ref_points_host_val, numBytes);
-        cudaMallocHost((float**)&result_prediction_host, numBytes);
+        cudaMallocHost((double**)&ref_points_host_x, numBytes);
+        cudaMallocHost((double**)&ref_points_host_y, numBytes);
+        cudaMallocHost((double**)&ref_points_host_val, numBytes);
+        cudaMallocHost((double**)&result_prediction_host, numBytes);
 
-        cudaMallocHost((float**)&freq1_host, sizeof(unsigned int));
-        cudaMallocHost((float**)&freq2_host, sizeof(unsigned int));
+        cudaMallocHost((unsigned int**)&freq1_host, sizeof(unsigned int));
+        cudaMallocHost((unsigned int**)&freq2_host, sizeof(unsigned int));
 
     } else {
         // Obtener Memoria en el host
