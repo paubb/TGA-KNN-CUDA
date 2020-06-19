@@ -130,7 +130,7 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     unsigned int nBlocks, nThreads;
 
     float TiempoKernelDistance, TiempoKernelFreq;
-	cudaEvent_t E0, E1, E2, E3, E4, E5, E6, E7;
+    cudaEvent_t E0, E1, E2, E3, E4, E5, E6, E7;
 
     cudaEventCreate(&E0);
     cudaEventCreate(&E1);
