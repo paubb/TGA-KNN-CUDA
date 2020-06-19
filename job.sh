@@ -12,8 +12,23 @@ export PATH=/Soft/cuda/9.0.176/bin:$PATH
 #$ -S /bin/bash
 
 
-./knn.exe
+#./knn00.exe
+#nvprof --unified-memory-profiling off --print-gpu-summary ./knn00.exe
+nvprof --unified-memory-profiling off --print-gpu-trace ./knn00.exe
 
-nvprof --unified-memory-profiling off --print-gpu-summary ./knn.exe
-nvprof --unified-memory-profiling off --print-gpu-trace ./knn.exe
-nvprof --unified-memory-profiling off --metrics
+#./knn01.exe
+#nvprof --unified-memory-profiling off --print-gpu-summary ./knn01.exe
+#nvprof --unified-memory-profiling off --print-gpu-trace ./knn01.exe
+
+#./knn02.exe
+#nvprof --unified-memory-profiling off --print-gpu-summary ./knn02.exe
+#nvprof --unified-memory-profiling off --print-gpu-trace ./knn02.exe
+
+#./knn03.exe
+#nvprof --unified-memory-profiling off --print-gpu-summary ./knn03.exe
+#nvprof --unified-memory-profiling off --print-gpu-trace ./knn03.exe
+
+#./knn04.exe
+#nvprof --unified-memory-profiling off --print-gpu-summary ./knn04.exe
+#nvprof --unified-memory-profiling off --print-gpu-trace ./knn04.exe
+
