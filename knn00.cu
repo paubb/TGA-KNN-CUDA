@@ -8,7 +8,6 @@
 #include <time.h>
 using namespace std;
 
-#define PINNED 0
 #define THREADS 100
 
 struct Point
@@ -131,7 +130,18 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     unsigned int nBlocks, nThreads;
 
     float TiempoKernelDistance, TiempoKernelFreq;
-    cudaEvent_t E0, E1, E2, E3;
+	cudaEvent_t E0, E1, E2, E3, E4, E5, E6, E7;
+
+    cudaEventCreate(&E0);
+    cudaEventCreate(&E1);
+    cudaEventCreate(&E2);
+    cudaEventCreate(&E3);
+    cudaEventCreate(&E4);
+    cudaEventCreate(&E5);
+    cudaEventCreate(&E6);
+    cudaEventCreate(&E7);
+
+    cudaEventRecord(E6, 0);
 
     double *ref_points_dev_x   = NULL;
     double *ref_points_dev_y   = NULL;
@@ -159,10 +169,6 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     numBytes = nBlocks * nThreads * sizeof(double);
     printf("numBytes = %d \n", numBytes);
 
-    cudaEventCreate(&E0);
-    cudaEventCreate(&E1);
-    cudaEventCreate(&E2);
-    cudaEventCreate(&E3);
     
     // Obtener Memoria en el host
     ref_points_host_x = (double*) malloc(numBytes);
@@ -213,22 +219,23 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
     cudaFree(ref_points_dev_x);
     cudaFree(ref_points_dev_y);
     cudaFree(result_prediction_dev);
-
+	
+	cudaEventRecord(E4, 0);
+	
     // Sort the Points by distance from p
     selectionSort(result_prediction_host, ref_points_host_val, n);
-    /*
-        for(int i = 0; i < n; i++){
-        printf("L'element: %d\n", i);
-        printf("La distancia: %f\n", result_prediction_host[i]);
-        printf("La x: %f\n", ref_points_host_val[i]);
-    }
-    */
+    
+	cudaEventRecord(E5, 0); cudaEventSynchronize(E5);
+    cudaEventElapsedTime(&TiempoSort,  E4, E5);
+
     cudaEventRecord(E2, 0);
     // Ejecutar el kernel
     calculateFreq<<<k, 1>>>(k, ref_points_dev_val, freq1_dev, freq2_dev);
     
     cudaEventRecord(E3, 0); cudaEventSynchronize(E3);
     cudaEventElapsedTime(&TiempoKernelFreq,  E2, E3);
+    
+    TiempoAllOperations = TiempoKernelDistance + TiempoSort + TiempoKernelFreq;
 
     cudaMemcpy(freq1_host, freq1_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
     cudaMemcpy(freq2_host, freq2_dev, sizeof(unsigned int), cudaMemcpyDeviceToHost);
@@ -252,9 +259,15 @@ int classifyAPointCUDA(Point arr[], int n, int k, Point p)
 
     printf("Tiempo Kernel calculo distancia (00): %4.6f milseg\n", TiempoKernelDistance);
     printf("Tiempo Kernel calculo freq (00): %4.6f milseg\n", TiempoKernelFreq);
+	printf("Tiempo Sort (00): %4.6f milseg\n", TiempoSort);
+    printf("Tiempo todas las operaciones (00): %4.6f milseg\n", TiempoAllOperations);
 
     free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq1_host); free(freq2_host);
 
+    cudaEventRecord(E7, 0); cudaEventSynchronize(E7);
+    cudaEventElapsedTime(&TiempoProva,  E6, E7);
+
+    printf("Temps total CUDA: %4.6f milseg\n", TiempoProva);
     return result;
 
 }
@@ -311,33 +324,33 @@ int main(int argc, char** argv)
     printf(" and");
     printf(" y = %f", p.y);
     printf("\n");
+    
+	printf("\n");
+    printf("Programa Seqüencial -------------------------------------------------- \n");
+    printf("\n");
 
     // Calculate the time taken by the sequential code: classifyAPoint function
     clock_t t;
     t = clock();
     int result = classifyAPoint(arr, n, k, p);
     t = clock() - t;
-    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in seconds
+    float time_taken = ((float)t)/(CLOCKS_PER_SEC/1000); // in mseconds
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
 
-    printf ("Temps seqüencial:"
+    printf ("Temps total seqüencial:"
             " is %lf.\n", time_taken);
 
-    printf("---------------------------------------------------------------------- \n");
+    printf("\n");
+    printf("Programa CUDA -------------------------------------------------------- \n");
+    printf("\n");
 
-    // Calculate the time taken by the sequential code: classifyAPoint function
-    clock_t t2;
-    t2 = clock();
+
     int result2 = classifyAPointCUDA(arr, n, k, p);
-    t2 = clock() - t2;
-    float time_taken2 = ((float)t2)/CLOCKS_PER_SEC; // in seconds
-
-    printf ("The value classified to unknown point"
+    
+	printf ("The value classified to unknown point"
             " is %d.\n", result2);
 
-    printf ("Temps CUDA:"
-            " is %lf.\n", time_taken2);
-
 }
+
