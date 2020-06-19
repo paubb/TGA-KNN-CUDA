@@ -338,9 +338,9 @@ int main(int argc, char** argv)
 
     printf ("The value classified to unknown point"
             " is %d.\n", result);
-
+	
     printf ("Temps total seqüencial:"
-            " is %lf.\n", time_taken);
+            " %lf milseg.\n", time_taken);
 
     printf("\n");
     printf("Programa CUDA -------------------------------------------------------- \n");
