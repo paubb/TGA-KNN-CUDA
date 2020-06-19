@@ -301,7 +301,6 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq_host);
     }
 
-    cudaDeviceReset();
 	
     cudaEventRecord(E7, 0); cudaEventSynchronize(E7);
     cudaEventElapsedTime(&TiempoProva,  E6, E7);
