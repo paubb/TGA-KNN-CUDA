@@ -1,0 +1,26 @@
+k = 101 
+The Testing Point values are: x = 50.200001 and y = 36.000000
+
+Programa Seqüencial -------------------------------------------------- 
+
+freq1 is 45.
+freq2 is 56.
+The value classified to unknown point is 1.
+Temps total seqüencial: 471.966003 milseg.
+
+Programa CUDA -------------------------------------------------------- 
+
+nBlocks = 128 
+numBytes = 524288 
+Invocació Kernel Sort <<<nBlocks, nKernels>>> (N): <<<2, 128>>> (131072)
+freq1 is 45.
+freq2 is 56.
+The value classified to unknown point is 1.
+Invocació Kernel <<<nBlocks, nKernels>>> (N): <<<128, 1024>>> (131072)
+Tiempo Kernel calculo distancia (00): 0.242592 milseg
+Tiempo Kernel calculo freq (00): 0.013600 milseg
+Tiempo Sort (00): 377.104767 milseg
+Tiempo todas las operaciones (00): 377.360962 milseg
+NO usa Pinned Memory
+Temps total CUDA: 381.795410 milseg
+The value classified to unknown point is 1.
