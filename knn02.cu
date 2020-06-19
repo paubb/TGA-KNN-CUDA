@@ -13,7 +13,7 @@ using namespace std;
 
 struct Point
 {
-    double x, y;     // Co-ordinate of point
+    float x, y;     // Co-ordinate of point
 };
 
 void selectionSort(float *result_prediction_host, float *ref_points_host_val, int n) {
@@ -38,9 +38,9 @@ void selectionSort(float *result_prediction_host, float *ref_points_host_val, in
  * @param k      number of points we want to use for the prediction
  * @param p      point we want to predict
  */
-int classifyAPoint(Point arr[], int n, int k, Point p, double val[])
+int classifyAPoint(Point arr[], int n, int k, Point p, float val[])
 {
-    double distances[n];
+    float distances[n];
 
     // Fill distances of all points from p
     for (int i = 0; i < n; i++)
@@ -132,15 +132,15 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     cudaEventRecord(E6, 0);
 
-    double *ref_points_dev_x   = NULL;
-    double *ref_points_dev_y   = NULL;
-    double *ref_points_dev_val   = NULL;
-    double *result_prediction_dev  = NULL;
+    float *ref_points_dev_x   = NULL;
+    float *ref_points_dev_y   = NULL;
+    float *ref_points_dev_val   = NULL;
+    float *result_prediction_dev  = NULL;
 
-    double *ref_points_host_x   = NULL;
-    double *ref_points_host_y = NULL;
-    double *ref_points_host_val   = NULL;
-    double *result_prediction_host  = NULL;
+    float *ref_points_host_x   = NULL;
+    float *ref_points_host_y = NULL;
+    float *ref_points_host_val   = NULL;
+    float *result_prediction_host  = NULL;
 
     unsigned int *freq1_dev = NULL;
     unsigned int *freq2_dev = NULL;
@@ -271,7 +271,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host); free(freq1_host); free(freq2_host);
     }
 
-    cudaDeviceReset();
+    
     
     cudaEventRecord(E7, 0); cudaEventSynchronize(E7);
     cudaEventElapsedTime(&TiempoProva,  E6, E7);
@@ -320,12 +320,14 @@ int main(int argc, char** argv)
     n = 10000; // Number of data points
     Point arr[n];
 
-    double val[n];
+    float val[n];
+	float val2[n];
 
     for(int i = 0; i < n; ++i) {
         arr[i].x = rand() % 100;
         arr[i].y = rand() % 100;
         val[i] = rand() % 2;
+	val2[i] = val[i];
     }
 
     printf("k = %d \n", k);
@@ -357,7 +359,7 @@ int main(int argc, char** argv)
     printf("Programa CUDA -------------------------------------------------------- \n");
     printf("\n");
 
-    int result2 = classifyAPointCUDA(arr, n, k, p);
+    int result2 = classifyAPointCUDA(arr, val2, n, k, p);
     
 	printf ("The value classified to unknown point"
             " is %d.\n", result2);
