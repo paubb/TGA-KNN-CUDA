@@ -16,7 +16,7 @@ struct Point
     double x, y;     // Co-ordinate of point
 };
 
-void selectionSort(double *result_prediction_host, double *ref_points_host_val, int n) {
+void selectionSort(float *result_prediction_host, float *ref_points_host_val, int n) {
    int i, j, min, temp, temp2;
    for (i = 0; i < n - 1; i++) {
       min = i;
@@ -68,7 +68,7 @@ int classifyAPoint(Point arr[], int n, int k, Point p, double val[])
     return (freq1 > freq2 ? 0 : 1);
 }
 
-void InitHostInput(Point arr[], int n, double val[], Point p, double *ref_points_host_x, double *ref_points_host_y, double *ref_points_host_val) {
+void InitHostInput(Point arr[], int n, float val[], Point p, float *ref_points_host_x, float *ref_points_host_y, float *ref_points_host_val) {
 
     for (int i=0; i<n; i++) {
         ref_points_host_x[i] = arr[i].x;
@@ -85,7 +85,7 @@ void InitHostFreq(unsigned int *freq1_host, unsigned int *freq2_host) {
 
 }
 
-__global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, double *ref_points_dev_y, double *result_prediction_dev) {
+__global__ void calculateDistance(int n, Point p, float *ref_points_dev_x, float *ref_points_dev_y, float *result_prediction_dev) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     // Fill distances of all points from p
@@ -97,7 +97,7 @@ __global__ void calculateDistance(int n, Point p, double *ref_points_dev_x, doub
 
 }
 
-__global__ void calculateFreq(int k, double *ref_points_host_val, unsigned int *freq1_dev, unsigned int *freq2_dev) {
+__global__ void calculateFreq(int k, float *ref_points_host_val, unsigned int *freq1_dev, unsigned int *freq2_dev) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -112,7 +112,7 @@ __global__ void calculateFreq(int k, double *ref_points_host_val, unsigned int *
     }
 }
 
-int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
+int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 {
     unsigned int N;
     unsigned int numBytes;
@@ -170,10 +170,10 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
 
     } else {
         // Obtener Memoria en el host
-        ref_points_host_x = (double*) malloc(numBytes);
-        ref_points_host_y = (double*) malloc(numBytes);
-        ref_points_host_val = (double*) malloc(numBytes);
-        result_prediction_host = (double*) malloc(numBytes);
+        ref_points_host_x = (float*) malloc(numBytes);
+        ref_points_host_y = (float*) malloc(numBytes);
+        ref_points_host_val = (float*) malloc(numBytes);
+        result_prediction_host = (float*) malloc(numBytes);
 
         freq1_host = (unsigned int*) malloc(sizeof(unsigned int));
         freq2_host = (unsigned int*) malloc(sizeof(unsigned int));
@@ -184,10 +184,10 @@ int classifyAPointCUDA(Point arr[], double val[], int n, int k, Point p)
     InitHostFreq(freq1_host, freq2_host);
 
     // Obtener Memoria en el device
-    cudaMalloc((double**)&ref_points_dev_x, numBytes);
-    cudaMalloc((double**)&ref_points_dev_y, numBytes);
-    cudaMalloc((double**)&ref_points_dev_val, numBytes);
-    cudaMalloc((double**)&result_prediction_dev, numBytes);
+    cudaMalloc((float**)&ref_points_dev_x, numBytes);
+    cudaMalloc((float**)&ref_points_dev_y, numBytes);
+    cudaMalloc((float**)&ref_points_dev_val, numBytes);
+    cudaMalloc((float**)&result_prediction_dev, numBytes);
 
     cudaMalloc((unsigned int**)&freq1_dev, sizeof(unsigned int));
     cudaMalloc((unsigned int**)&freq2_dev, sizeof(unsigned int));
