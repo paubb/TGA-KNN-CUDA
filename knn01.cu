@@ -76,6 +76,7 @@ int classifyAPoint(Point arr[], int n, int k, Point p)
         else if (arr[i].val == 1)
             freq2++;
     }
+	
     printf ("freq1 is %d.\n", freq1);
     printf ("freq2 is %d.\n", freq2);
 
