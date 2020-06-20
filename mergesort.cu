@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//AQUEST ÉS EL CODI PROPORCIONAT PELS NOSTRES COMPANYS
+
 __device__ void mergeDevice(int *list, int *sorted, int start, int mid, int end)
 {
     int ti=start, i=start, j=mid;
