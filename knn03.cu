@@ -333,6 +333,8 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
         cudaMallocHost((float**)&arrSorted_h, nBytes_sort);
         cudaMallocHost((float**)&arrSortedF_h, nBytes_sort);
+	cudaMallocHost((float**)&arrSorted2_h, nBytes_sort);
+        cudaMallocHost((float**)&arrSortedF2_h, nBytes_sort);
 
         cudaMallocHost((unsigned int**)&freq_host, sizeof(unsigned int)*2);
 
@@ -475,7 +477,7 @@ int classifyAPointCUDA(Point arr[], float val[], int n, int k, Point p)
 
     if (PINNED) {
         cudaFreeHost(ref_points_host_x); cudaFreeHost(ref_points_host_y); cudaFreeHost(ref_points_host_val);
-        cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h);
+        cudaFreeHost(result_prediction_host); cudaFreeHost(freq_host); cudaFreeHost(arrSorted_h);cudaFreeHost(arrSortedF_h); cudaFreeHost(arrSorted2_h);cudaFreeHost(arrSortedF2_h);
     } else {
         free(ref_points_host_x); free(ref_points_host_y); free(ref_points_host_val); free(result_prediction_host);
         free(arrSorted_h); free(arrSortedF_h); free(freq_host); free(arrSorted2_h); free(arrSortedF2_h);
