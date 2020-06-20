@@ -1,0 +1,11 @@
+- Per executar el programa, primer cal obtindre els fitxers .exe de totes les versions, 
+  els quals es poden obtenir mitjançant la comanda: make all
+
+- Un cop es tenen els fitxers .exe cal enviar mitjançant el job.sh els fitxers a la cua d'execució del boada, 
+  per fer-ho cal modificar el job.sh comentant o descomentant les diferents execucions que hem utilitzat nosaltres per cada versió.
+
+- Si s'envia sense modificar s'enviarà a la cua l'execució per defecte de la versió final del nostre programa.
+- Si es vol modificar els paràmetres de la k o les coordenades del punt sobre el que es vol fer la predicció només cal canviar del job.sh
+  els paràmetres de l'execució sent el primer la k, el segon les coordenades x i el tercer les coordenades y, tal i com es pot veure en aquest exemple:
+  
+  ./knn.exe 20 1 2
